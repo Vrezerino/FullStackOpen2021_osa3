@@ -6,7 +6,10 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+		"deploy": "git push heroku main",
+		"logs:prod": "heroku logs -t",
+    "lint": "eslint ."
   },
   "author": "vres aka patrick",
   "license": "ISC",
@@ -19,6 +22,7 @@
     "morgan": "^1.10.0"
   },
   "devDependencies": {
+    "eslint": "^7.31.0",
     "nodemon": "^2.0.12"
   }
 }
