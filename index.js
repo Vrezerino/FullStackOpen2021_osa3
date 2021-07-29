@@ -24,6 +24,7 @@ const errorHandler = (e, req, res, next) => {
 
 app.get('/api/persons', (req, res, next) => {
   Person.find({}).then(people => res.json(people))
+  .catch(e => next(e))
 })
 
 app.get('/api/persons/:id', (req, res, next) => {
