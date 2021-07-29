@@ -1,61 +1,83 @@
 const express = require('express')
+const app = express()
 const morgan = require('morgan')
 const cors = require('cors')
-const app = express()
+require('dotenv').config()
+const Person = require('./modules/person')
 
-app.use(express.json())
 app.use(express.static('build'))
 app.use(cors())
-let persons = require('./persons')
+app.use(express.json())
 
 morgan.token('body', (req) => JSON.stringify(req.body))
 app.use(morgan(':method :url :status - :response-time ms :body'))
 
-app.get('/api/persons', (req, res) => {
-  res.json(persons.array)
-})
-
-app.get('/api/persons/:id', (req, res) => {
-  const id = Number(req.params.id)
-  const person = persons.array.find(p => p.id === id)
-  if (person) {
-    res.json(person)
-  } else {
-    res.status(404).end('Person with that ID could not be found!')
+const errorHandler = (e, req, res, next) => {
+  console.error(e.message)
+  if (e.name === 'CastError') {
+    return res.status(400).send(e.message)
+  } else if (e.name === 'ValidationError') {
+    return res.status(400).send('Name must be longer than 3 characters and number longer than 8!')
   }
+  next(e)
+}
+
+app.get('/api/persons', (req, res, next) => {
+  Person.find({}).then(people => res.json(people))
 })
 
-app.delete('/api/persons/:id', (req, res) => {
-  const id = Number(req.params.id)
-  const person = persons.array.find(p => p.id === id)
-  if (person) {
-    persons.array = persons.array.filter(p => p.id !== id)
-    res.status(204).end()
-  } else {
-    res.status(404).end('Person with that ID could not be found!')
-  }
+app.get('/api/persons/:id', (req, res, next) => {
+  Person.findById(req.params.id).then(p => {
+    if (p) {
+      res.json(p)
+    } else {
+      res.status(404).send('404 Not Found: Person with that ID does not exist!')
+    }
+  })
+  .catch(e => next(e))
 })
 
-app.post('/api/persons/', (req, res) => {
+app.delete('/api/persons/:id', (req, res, next) => {
+  Person.findByIdAndRemove(req.params.id)
+    .then(result => res.status(204).end())
+    .catch(e => next(e))
+})
+
+app.post('/api/persons/', (req, res, next) => {
   const body = req.body
-  if (!body.name || !body.number) return res.status(400).end('Submit both the name and number of new person!')
-  if (persons.array.find(p => p.name === body.name)) return res.status(400).end('This name is already in the phonebook!')
+  const person = new Person({
+    name: body.name,
+    number: body.number
+  })
+  person.save().then(p => res.json(p))
+  .catch(e => next(e))
+})
 
+app.put('/api/persons/:id', (req, res, next) => {
+  const body = req.body
   const person = {
-    id: Math.floor(Math.random() * (1000 - 5) + 5),
     name: body.name,
     number: body.number
   }
-  persons.array = persons.array.concat(person)
-  res.json(person)
+  Person.findByIdAndUpdate(req.params.id, person, { new: true, runValidators: true, context: 'query' })
+  .then(updatedPerson => res.json(updatedPerson))
+  .catch(e => next(e))
 })
 
 app.get('/info', (req, res) => {
-  res.send(`
-    There are <b>${persons.array.length}</b> people in the phonebook.
+  Person.countDocuments({}, (e, count) => {
+    res.send(`
+    There are <b>${count}</b> people in the phonebook.
     <p>${new Date()}</p>
     `)
+  })
+  .catch(e => next(e))
 })
+
+const notFound = (req, res) => res.status(404).send('Error 404: Not found!')
+
+app.use(notFound)
+app.use(errorHandler)
 
 const PORT = process.env.PORT || 3001
 app.listen(PORT, () => {
